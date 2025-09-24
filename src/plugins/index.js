@@ -2,7 +2,9 @@ import 'leaflet-rotatedmarker'
 import L from "leaflet"
 import 'leaflet-measure-path'
 import 'leaflet-polylinedecorator'
-import { assign } from 'radash'
+import {
+	assign
+} from 'radash'
 import dayjs from 'dayjs'
 /**
  * @typedef {Object} OrginTrackItem
@@ -126,18 +128,24 @@ export default class TrackPlayer {
 	 * @type {Object} 轨迹运动动画timer对象
 	 */
 	_TrackAnimateTimer = null
-	
+
 	/**
 	 * @description TrackPlayer 事件管理
 	 * @property {Set} onProgressUpdate - 进度更新事件集合
 	 */
-	_Event={
-		'onProgressUpdate':new Set()
+	_Event = {
+		'onProgressUpdate': new Set(),
+		// 'onProgressStart': new Set(),
+		// 'onProgressPause': new Set(),
+		// 'onProgressEnd': new Set(),
+		// 'onProgressDestroy': new Set(),
+		'onArriveTrackPoint': new Set() //到达其中一个坐标点
 	}
 
 	_Options = {
-		endedToStart: true, //结束是否恢复到起点
-		loop: true,
+		viewFollow: true,
+		endedToStart: false, //结束是否恢复到起点
+		loop: false,
 		MarkerRotate: true, //默认轨迹移动角色 在移动时根据轨迹拐角进行旋转
 		MarkerIcon: null,
 		TrackLine: {
@@ -150,20 +158,20 @@ export default class TrackPlayer {
 		}
 
 	}
-	
-	
+
+
 	/**
 	 * @description 计算每个坐标点之间间隔的时间单位 实现坐标点之间根据时间差计算动画移动时间，当为none表示每个路径缓冲点的动画时间为匀速100ms进行。 
 	 * @type {'second'|'minute'|'hour'|'none'} 这个单位的作用就是防止有的两个坐标点之间的时间拉的很长导致实际运行的动画时间很长
 	 */
-	_duration_unit='minute'  
-	
-	
-	
+	_duration_unit = 'minute'
+
+
+
 	/**
 	 * @description 控制坐标点之间生成的缓冲点个数 该属性为只读属性不允许外界更改 仅在代码开发时控制
 	 */
-	_IntermediatePointNumber=500 //默认生成500个缓冲点
+	_IntermediatePointNumber = 500 //默认生成500个缓冲点
 
 	/**
 	 * @param {TrackPlayerOptions} options
@@ -171,7 +179,7 @@ export default class TrackPlayer {
 	constructor(options) {
 		this.setSpeed(options.speed)
 
-		this._Options= assign(this._Options, options)
+		this._Options = assign(this._Options, options)
 	}
 
 
@@ -182,15 +190,17 @@ export default class TrackPlayer {
 	 * @param {OrginTrackItem[]} TrackData 轨迹JSON数据 一定要按日期排序 越旧的日期排在前面 
 	 */
 	init(Map, TrackData) {
+		if (this._Alive) return //防止多次初始化
+
 		this._map = Map
 
 		//计算PassMarker所处每个轨迹点的角度
 		this._Track_Data = TrackData.map(item => ({
 			...item,
 			rotate: this._calcPassMarkerRotate(item, TrackData),
-			IntermediatePointsIndex:0,
-			intermediatePoints:[],
-			duration:0
+			IntermediatePointsIndex: 0,
+			intermediatePoints: [],
+			duration: 0
 		}))
 
 		//创建行驶轨迹图层添加到地图中
@@ -201,9 +211,9 @@ export default class TrackPlayer {
 		this._createPassLine()
 
 		this._createPassMarker()
-		
+
 		//计算进度步进数
-		this._TrackProgressStep = 100 / (this._Track_Data.length-1)/this._IntermediatePointNumber
+		this._TrackProgressStep = 100 / (this._Track_Data.length - 1) / this._IntermediatePointNumber
 
 		//激活插件
 		this._Alive = true
@@ -213,27 +223,58 @@ export default class TrackPlayer {
 			progressStep: this._TrackProgressStep //如需使用进度控制轨迹，则需要按指定轨迹步进数进行控制 
 		}
 	}
-	
+
 	/**
 	 * @description 添加监听事件
 	 * @param {String} EventType _Event中定义的事件类型
 	 * @param {Function} EventCallBackFnc 触发回调事件
 	 */
-	on(EventType,EventCallBackFnc){
-		if(!this._Event[EventType]) return
+	on(EventType, EventCallBackFnc) {
+		if (!this._Event[EventType]) return
 		this._Event[EventType].add(EventCallBackFnc)
 	}
-	
+
 	/**
 	 * @description 添加监听事件
 	 * @param {String} EventType _Event中定义的事件类型
 	 * @param {Function} EventCallBackFnc 触发回调事件
 	 */
-	off(EventType,EventCallBackFnc){
-		if(!this._Event[EventType]) return
-		if(this._Event[EventType].has(EventCallBackFnc)){
+	off(EventType, EventCallBackFnc) {
+		if (!this._Event[EventType]) return
+		if (this._Event[EventType].has(EventCallBackFnc)) {
 			this._Event[EventType].delete(EventCallBackFnc)
 		}
+	}
+
+	/**
+	 * @description 添加轨迹数据
+	 * @param {OrginTrackItem[]} trackData 
+	 */
+	addTrackData(oriTrackData) {
+		if (!this._Alive) {
+			console.error('轨迹插件未初始化')
+			return
+		}
+		let trackData = oriTrackData.map(item => {
+			return {
+				...item,
+				rotate: this._calcPassMarkerRotate(item, oriTrackData),
+				IntermediatePointsIndex: 0,
+				intermediatePoints: [],
+				duration: 0
+			}
+		})
+		trackData = this._Track_Data.concat(trackData)
+		this._TrackLine.setLatLngs(trackData.map(item => {
+			return {
+				lat: item.lat,
+				lng: item.lng
+			}
+		}))
+		this._TrackLineDecorator.setPaths(this._TrackLine)
+
+		this._Track_Data = trackData
+
 	}
 
 
@@ -242,8 +283,8 @@ export default class TrackPlayer {
 	 * @param {number} progress  轨迹运行进度，不传则以当前记录的进度继续运行。传入进度则跳转到指定进度开始运行
 	 */
 	startTrack(progress) {
-	
-		
+
+
 		if (this._TrackStatus == 'unStart') return
 		this._PassMarkStatus = 'moving'
 		this._TrackStatus = 'progress'
@@ -253,51 +294,52 @@ export default class TrackPlayer {
 		//如果设置开始的进度不等于0 例如从中间进度开始播放 则需要将当前位置设置为该进度所处位置的上一个位置，因为触发立刻移动方法将会立刻移动到下一步。所以地图上表示出来的效果就是移动到该进度所处位置
 		if (progress && progress !== 0) {
 
-			let curProgressCopies = calcProgressCopies((this._Track_Data.length-1)*this._IntermediatePointNumber, progress) //计算出当前进度所处总轨迹中的哪一步
+			let curProgressCopies = calcProgressCopies((this._Track_Data.length - 1) * this
+				._IntermediatePointNumber, progress) //计算出当前进度所处总轨迹中的哪一步
 			curProgressCopies % 1 > 0 && (console.warn('请按插件所返回的进度步进范围进行控制，否则进度将可能导致不一致'))
-			let Copies=String(Math.round(curProgressCopies) / this._IntermediatePointNumber).split('.')
-			let curTrackIndex= Number(Copies[0])
-			let curIntermediatePointIndex=Number(Copies[1]?'0.'+Copies[1]:0)*this._IntermediatePointNumber
-		
+			let Copies = String(Math.round(curProgressCopies) / this._IntermediatePointNumber).split('.')
+			let curTrackIndex = Number(Copies[0])
+			let curIntermediatePointIndex = Number(Copies[1] ? '0.' + Copies[1] : 0) * this._IntermediatePointNumber
+
 			this._CurTrackData = this._Track_Data[curTrackIndex] //由于将要立刻触发移动方法会移动到下一步。而下一步为该进度所处的位置，所以设置当前所处轨迹为上一步
-				this._CurTrackData.IntermediatePointsIndex=curIntermediatePointIndex
-				
-		}else if(progress == 0){
-		
+			this._CurTrackData.IntermediatePointsIndex = curIntermediatePointIndex
+
+		} else if (progress == 0) {
+
 			//当传入的progress进度为0 时，将当前所运行到的坐标置为空
-			this._CurTrackData=null
+			this._CurTrackData = null
 		}
-		
+
 		//先清除动画，保证下一步触发移动时 不会被干扰
 		if (this._TrackAnimateTimer) {
 			this._TrackAnimateTimer && clearTimeout(this._TrackAnimateTimer)
 			this._TrackAnimateTimer = null
 		}
-		
+
 		this._TrackPassMarkerMove() //立即触发移动
 		this._animateTrack() //开始加载自动轨迹移动动画
 	}
-	
+
 	/**
 	 * @description 重置
 	 */
-	reStart(){
+	reStart() {
 		if (this._TrackAnimateTimer) {
 			this._TrackAnimateTimer && clearTimeout(this._TrackAnimateTimer)
 			this._TrackAnimateTimer = null
 		}
 		this._Track_Data = this._Track_Data.map(item => ({
 			...item,
-			IntermediatePointsIndex:0, //重新置空下标
+			IntermediatePointsIndex: 0, //重新置空下标
 		}))
 		this._TrackStatus = 'progress'
-		
+
 		this._PassMarkStatus = 'stop'
 		//将当前达到运行的坐标置为空 
-		this._CurTrackData=null
+		this._CurTrackData = null
 		this._TrackPassMarkerMove() //立即触发移动 回到开始位置
 	}
-	
+
 
 	/**
 	 * @description 销毁轨迹运动
@@ -311,7 +353,7 @@ export default class TrackPlayer {
 		this._PassMarkStatus = 'stop'
 		this._TrackProgress = 0.00
 		this._TrackProgressStep = 0
-		this._speed=1
+		this._speed = 1
 		if (this._TrackAnimateTimer) {
 			this._TrackAnimateTimer && clearTimeout(this._TrackAnimateTimer)
 			this._TrackAnimateTimer = null
@@ -328,10 +370,10 @@ export default class TrackPlayer {
 
 		this._map.removeLayer(this._TrackerLayerGroup) //将track插件的group图层从地图中移除
 		this._TrackerLayerGroup = null
-		
+
 		//重置插件事件
-		Object.keys(this._Event).forEach(eventName=>{
-			this._Event[eventName]=new Set()
+		Object.keys(this._Event).forEach(eventName => {
+			this._Event[eventName] = new Set()
 		})
 	}
 
@@ -353,16 +395,16 @@ export default class TrackPlayer {
 		this._CurTrackData = null
 		this._Track_Data = this._Track_Data.map(item => ({
 			...item,
-			IntermediatePointsIndex:0, //重新置空下标
+			IntermediatePointsIndex: 0, //重新置空下标
 		}))
-		
-		
+
+
 		if (this._TrackAnimateTimer) {
 			this._TrackAnimateTimer && clearTimeout(this._TrackAnimateTimer)
 			this._TrackAnimateTimer = null
 		}
-		
-		
+
+
 
 		//如果结束后重新回到起点
 		if (this._Options.endedToStart) {
@@ -370,9 +412,9 @@ export default class TrackPlayer {
 
 			this._PassMarkStatus = 'stop'
 			//将当前达到运行的坐标置为空 
-			this._CurTrackData=null
+			this._CurTrackData = null
 			this._TrackPassMarkerMove() //立即触发移动 回到开始位置
-			
+
 		}
 
 		//如果进行循环
@@ -396,22 +438,22 @@ export default class TrackPlayer {
 			this._TrackAnimateTimer && clearTimeout(this._TrackAnimateTimer)
 			this._TrackAnimateTimer = null
 		}
-		
+
 		//计算Marker在每个坐标间路径上缓冲点之间的动画时间
 		let easingAnimateTime; //计算两个坐标点之间的 中间缓动点之间的动画间隔时间
-		if(this._duration_unit!='none'){
-			easingAnimateTime=this._CurTrackData.duration / this._CurTrackData.intermediatePoints.length
-		}else{
-			easingAnimateTime=100
+		if (this._duration_unit != 'none') {
+			easingAnimateTime = this._CurTrackData.duration / this._CurTrackData.intermediatePoints.length
+		} else {
+			easingAnimateTime = 100
 		}
-		
-		easingAnimateTime= easingAnimateTime/ this._speed  //还要除以用户设置的速度 速度越快缓冲点间的动画间隔越短
-		
-		if(easingAnimateTime<20){
+
+		easingAnimateTime = easingAnimateTime / this._speed //还要除以用户设置的速度 速度越快缓冲点间的动画间隔越短
+
+		if (easingAnimateTime < 20) {
 			console.warn('⚠ 当动画时间间隔小于20ms ，将无法达到直观的坐标点之间运动时间效果 请调整_duration_unit与_speed参数')
 		}
-	
-	
+
+
 		this._TrackAnimateTimer = setTimeout(() => {
 			//当行驶的轨迹角色对象处于可移动时。则进行移动的逻辑处理
 			if (this._PassMarkStatus == 'moving') {
@@ -423,7 +465,7 @@ export default class TrackPlayer {
 			if (this._TrackStatus == 'progress') {
 				this._animateTrack()
 			}
-		},easingAnimateTime)
+		}, easingAnimateTime)
 	}
 
 
@@ -431,64 +473,68 @@ export default class TrackPlayer {
 	 * @description 处理轨迹运动对象运动逻辑 立即移动到下一个点
 	 */
 	_TrackPassMarkerMove() {
-		
+
 		let nextTrackData;
 		let nextTrackIndex = 0;
 		if (!this._CurTrackData) { //不存在说明之前没有进行过轨迹运动
 			nextTrackData = this._Track_Data[0]
 		} else {
-			 nextTrackIndex = this._Track_Data.findIndex(item => item.time == this._CurTrackData
+			nextTrackIndex = this._Track_Data.findIndex(item => item.time == this._CurTrackData
 				.time) //以时间为标识 找到运动轨迹对象这次所需要运行到的坐标
-			
+
 			nextTrackData = this._Track_Data[nextTrackIndex]
 			//判断该坐标的路径点是否全部执行完
-			if(nextTrackData.IntermediatePointsIndex<nextTrackData.intermediatePoints.length-1){
-				
-				nextTrackData.IntermediatePointsIndex+=1
-			}else{
-				
-				
-				
-				
+			if (nextTrackData.IntermediatePointsIndex < nextTrackData.intermediatePoints.length - 1) {
+
+				nextTrackData.IntermediatePointsIndex += 1
+			} else {
+
 				//如果该路径点已全部执行完 那么判断已经到下一个坐标点了
-				nextTrackIndex+=1
-				nextTrackData=this._Track_Data[nextTrackIndex]
+				nextTrackIndex += 1
+				nextTrackData = this._Track_Data[nextTrackIndex]
+				nextTrackData.IntermediatePointsIndex = 0 //每次到达新的坐标点 这个坐标点至下个坐标点的路径都从0开始，解决轨迹进度回溯导致的轨迹路径跳跃的问题
 			}
 		}
 
 
+
+
 		//如果正在运行的轨迹点是 最后一个了则结束轨迹运动
-		if (nextTrackIndex>=this._Track_Data.length-1) {
-		
+		if (nextTrackIndex >= this._Track_Data.length - 1) {
 			this._endTrack()
 			return
 		}
-		
+
 		//如果该坐标的路径中间点从0开始的 说明才开始执行该路径上的中间点动画。计算出该坐标到下一个坐标的路径中间点
-		if(nextTrackData.IntermediatePointsIndex==0||nextTrackData.intermediatePoints.length==0){
-			let startTrack=nextTrackData
-			let endTrack=this._Track_Data[nextTrackIndex+1]
+		if (nextTrackData.intermediatePoints.length == 0) {
+			let startTrack = nextTrackData
+			let endTrack = this._Track_Data[nextTrackIndex + 1]
 			//实际上这里的nextTrackData 表示正所处的坐标点。
-			nextTrackData.intermediatePoints=calculateIntermediatePoints([startTrack.lat,startTrack.lng],[endTrack.lat,endTrack.lng],this._IntermediatePointNumber,false)					
+			nextTrackData.intermediatePoints = calculateIntermediatePoints([startTrack.lat, startTrack.lng], [
+				endTrack.lat, endTrack.lng
+			], this._IntermediatePointNumber)
 		}
 		//由于可通过外界动态随时更改duration_unit 所以每次都需要重新计算 两个坐标点的运行间隔
-		let timeDiff= dayjs(this._Track_Data[nextTrackIndex+1].time).valueOf() -  dayjs(nextTrackData.time).valueOf()
-	
-		switch(this._duration_unit){
+		let timeDiff = dayjs(this._Track_Data[nextTrackIndex + 1].time).valueOf() - dayjs(nextTrackData.time)
+			.valueOf()
+
+		switch (this._duration_unit) {
 			case 'second':
-			nextTrackData.duration=timeDiff
-			break;
+				nextTrackData.duration = timeDiff
+				break;
 			case 'minute':
-			nextTrackData.duration=timeDiff/6
-			break;
+				nextTrackData.duration = timeDiff / 6
+				break;
 			case 'hour':
-			nextTrackData.duration=timeDiff/36
-			break;
+				nextTrackData.duration = timeDiff / 36
+				break;
 			case 'none': //如果_duration_unit 为none表示每段坐标间路径的缓冲点均已匀速进行
-			break;
+				break;
 		}
-		
-		
+
+
+
+
 
 		//更新行驶的轨迹角色位置
 		this._PassMarker.setLatLng({
@@ -496,7 +542,7 @@ export default class TrackPlayer {
 			lng: nextTrackData.intermediatePoints[nextTrackData.IntermediatePointsIndex].lng
 		})
 
-	
+
 
 		if (this._Options.MarkerRotate) {
 			this._PassMarker.setRotationAngle((nextTrackData.rotate * 180 / Math.PI) / 2)
@@ -507,19 +553,43 @@ export default class TrackPlayer {
 			lng: item.lng,
 			lat: item.lat
 		}))
-		
-		
-		
-		this._PassLine.setLatLngs(PassTrackData.concat(nextTrackData.intermediatePoints.filter(((item, index) => nextTrackData.IntermediatePointsIndex >= index)))) //拼接上缓冲点的坐标数据
+
+
+
+		this._PassLine.setLatLngs(PassTrackData.concat(nextTrackData.intermediatePoints.filter(((item, index) =>
+			nextTrackData.IntermediatePointsIndex >= index)))) //拼接上缓冲点的坐标数据
 		this._PassLineDecorator.setPaths(this._PassLine)
+
+
+		//到达一个新的坐标点时发布onArriveTrackPoint事件
+		if (nextTrackData.IntermediatePointsIndex == 0) {
+			this._Event.onArriveTrackPoint.forEach(event => event(nextTrackData))
+		}
+
+
+		//如果开启了视角跟随
+		if (this._Options.viewFollow && nextTrackData.IntermediatePointsIndex == 0) {
+			this._map.flyTo({
+				lat: nextTrackData.intermediatePoints[nextTrackData.IntermediatePointsIndex].lat,
+				lng: nextTrackData.intermediatePoints[nextTrackData.IntermediatePointsIndex].lng
+			}, this._map.getZoom())
+		}
+
 
 		this._CurTrackData = nextTrackData
 
+
+
 		//计算出当前轨迹数据处于总轨迹的百分比 正在进行的坐标点进度 加上 该坐标点至下一个坐标点的缓冲点进度
-		let progress=(100 / (this._Track_Data.length-1) * nextTrackIndex)+(100 / (this._Track_Data.length-1)/this._IntermediatePointNumber*nextTrackData.IntermediatePointsIndex)
-		
-		console.log(progress)
+		let progress = (100 / (this._Track_Data.length - 1) * nextTrackIndex) + (100 / (this._Track_Data.length -
+			1) / this._IntermediatePointNumber * nextTrackData.IntermediatePointsIndex)
+
+
+		// console.log(progress)
 		this._setProgress(progress)
+
+
+
 	}
 
 
@@ -551,18 +621,18 @@ export default class TrackPlayer {
 				}
 			})
 		}
-		
-		
-		
+
+
+
 
 		// 把line和marker 组合
 		this._TrackLineDecorator = L.polylineDecorator(this._TrackLine, {
-			patterns:symbol? [{
+			patterns: symbol ? [{
 				offset: 1, //第一个图标偏移
 				endOffset: 1, //最后一个图标偏移
 				repeat: '100', //图标间距
 				symbol: symbol
-			}]:[]
+			}] : []
 		}).addTo(this._TrackerLayerGroup)
 	}
 
@@ -575,7 +645,7 @@ export default class TrackPlayer {
 			lat: this._Track_Data[0]?.lat,
 			lng: this._Track_Data[0]?.lng
 		}], {
-			color:this._Options.PassLine?.lineColor,
+			color: this._Options.PassLine?.lineColor,
 			weight: 5
 		}).addTo(this._TrackerLayerGroup);
 
@@ -596,12 +666,12 @@ export default class TrackPlayer {
 
 
 		this._PassLineDecorator = L.polylineDecorator(this._PassLine, {
-			patterns:symbol? [{
+			patterns: symbol ? [{
 				offset: 1, //第一个图标偏移
 				endOffset: 1, //最后一个图标偏移
 				repeat: '100', //图标间距
 				symbol: symbol
-			}]:[]
+			}] : []
 		}).addTo(this._TrackerLayerGroup)
 	}
 
@@ -634,6 +704,9 @@ export default class TrackPlayer {
 
 	}
 
+
+
+
 	/**
 	 * @description 设置进度
 	 * @param 进度
@@ -651,8 +724,8 @@ export default class TrackPlayer {
 				MOVE_MARKER: this._PassMarker, //行驶的轨迹角色对象L.marker实例
 				TRACK_PASS_LINE: this._PassLineDecorator, //已行驶轨迹线L.Line实例
 			}
-			 //触发进度更新回调
-			this._Event['onProgressUpdate'].forEach(event=>event(params))
+			//触发进度更新回调
+			this._Event['onProgressUpdate'].forEach(event => event(params))
 		})
 	}
 
@@ -698,7 +771,7 @@ export default class TrackPlayer {
  */
 function calcProgressCopies(totalLength, curProgress) {
 
-	
+
 	let progressStep = 100 / totalLength
 	return curProgress / progressStep
 }
@@ -706,38 +779,36 @@ function calcProgressCopies(totalLength, curProgress) {
 
 
 
-	
-   /**
-	* @description 计算坐标之间路径的中间点 - 使用线性插值算法得出两点间的缓冲点
-	* @param {Object} start 开始坐标点
-	* @param {Object} end 结束坐标点
-	* @param {Object} numPoints 需要生成中间点数量
-	* @param {Boolean} hasContainStartAndEnd 生成的中间点是否包含开始和结束点
-	*/
-	
-     function calculateIntermediatePoints(start, end, numPoints,hasContainStartAndEnd=true ) {
-            
-			numPoints+=2 //因为需要掉开始和结尾两个坐标点所以外界拿到的路径点必须和要求生成的数量一致
-			const points = [];
-            const latStart = start[0];
-            const lngStart = start[1];
-            const latEnd = end[0];
-            const lngEnd = end[1];
-            
-            const latStep = (latEnd - latStart) / numPoints;
-            const lngStep = (lngEnd - lngStart) / numPoints;
-            
-            for (let i = 0; i <= numPoints; i++) {
-                const lat = latStart + (latStep * i);
-                const lng = lngStart + (lngStep * i);
-                points.push({
-					lat:lat, 
-					lng:lng
-				});
-            }
-            
-			if(hasContainStartAndEnd) return points
-			
-			
-            return points.filter((item,index)=> ![0,points.length-1].includes(index)) //除掉第一项开始的坐标点 和最后一项结束的坐标点
-        }
+
+/**
+ * @description 计算坐标之间路径的中间点 - 使用线性插值算法得出两点间的缓冲点
+ * @param {Object} start 开始坐标点
+ * @param {Object} end 结束坐标点
+ * @param {Object} numPoints 需要生成中间点数量
+ * @param {Boolean} hasContainStartAndEnd 生成的中间点是否包含开始和结束点
+ */
+
+function calculateIntermediatePoints(start, end, numPoints) {
+
+	const points = [];
+	const latStart = start[0];
+	const lngStart = start[1];
+	const latEnd = end[0];
+	const lngEnd = end[1];
+
+	const latStep = (latEnd - latStart) / numPoints;
+	const lngStep = (lngEnd - lngStart) / numPoints;
+
+	for (let i = 0; i <= numPoints; i++) {
+		const lat = latStart + (latStep * i);
+		const lng = lngStart + (lngStep * i);
+		points.push({
+			lat: lat,
+			lng: lng
+		});
+	}
+
+
+
+	return points //除掉第一项开始的坐标点 和最后一项结束的坐标点
+}
