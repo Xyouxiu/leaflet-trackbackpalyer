@@ -14,7 +14,11 @@
     "files": [
         "dist/*"
     ],
-    "repository": {},
+    
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:Xyouxiu/leaflet-trackbackpalyer.git"
+      },
     "bugs": {},
     "scripts": {
         "dev": "vite",

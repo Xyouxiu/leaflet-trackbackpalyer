@@ -7,11 +7,9 @@
 ```javascript
 
 	//创建trackPlayer插件对象
-	let trackPlayer = new TrackPlayer({
-					speed: 300
-			})
-
-
+	let trackPlayer = new TrackPlayer()
+	//初始化创建轨迹 返回轨迹进度步进数
+	let {progressStep}= this.trackPlayer.init(L.Map map,Array<TimePointType > TimePointData)
 
 ```
 
@@ -50,7 +48,7 @@
 		switch (action) {
 					case 'init':
 	    			//初始化trackPlayer 轨迹
-					let {progressStep}=trackPlayer.init(this.map,TimePointData)
+					let {progressStep}=trackPlayer.init(L.Map map,Array<TimePointType > TimePointData)
 				
 					break;
 	             	//更新轨迹运动速度
@@ -79,6 +77,7 @@
 | init         | (map:L.map,TimePointData:Array<TimePointType>)=> InitBackDataType | 初始化轨迹方法 TimePointData:Array<TimePointType>为轨迹路线JSON数据 |
 | setSpeed     | (speed:number\|null)=> void                                  | 设置轨迹角色运动速度                                         |
 | startTrack   | (progress:number\|null)=> void                               | 运行轨迹 (传入运动轨迹进度，轨迹将自动跳转到指定进度开始运动) <br />tips：注意传入的轨迹进度必须是插件返回的轨迹步进值得倍数。否则轨迹实际运行的效果将会混乱 |
+| reStart      | ()=> void                                                    | 重置轨迹进度                                                 |
 | pauseTrack   | ()=> void                                                    | 暂停轨迹运动                                                 |
 | destroyTrack | ()=> void                                                    | 销毁轨迹<br />tips：销毁轨迹后需要重新init生成轨迹。         |
 | on           | (EventType: TrackBackPlayerEvent, cb:Function)=>void         | 监听插件事件。EventType : 插件暴露的事件类型 ，cb: 触发事件的回调函数 |
