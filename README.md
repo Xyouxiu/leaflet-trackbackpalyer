@@ -2,7 +2,7 @@
 
 > 一款基于 Leaflet 地图开发的轨迹巡航插件
 
-
+**[基于Uniapp Demo示例](https://gitee.com/xieqianstudent/leaflet-track-back-player.git)**
 
 #### 初始化轨迹
 
