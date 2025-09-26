@@ -1,10 +1,36 @@
-###### Leaflet-TrackPlayer 1.1.4 中文文档
+# Leaflet-TrackPlayer 1.2.2 中文文档
 
 > 一款基于 Leaflet 地图开发的轨迹巡航插件
 
-![chrome_Qn8oM8VQ2s](https://gitee.com/xieqianstudent/picture/raw/master/chrome_Qn8oM8VQ2s.gif)
 
-##### 使用示例
+
+#### 初始化轨迹
+
+![初始化播放轨迹](https://gitee.com/xieqianstudent/picture/raw/master/初始化播放轨迹.gif)
+
+#### 播放|暂停|重置轨迹
+
+![重置播放暂停轨迹](https://gitee.com/xieqianstudent/picture/raw/master/重置播放暂停轨迹.gif)
+
+
+
+#### 跳转轨迹进度
+
+![跳转轨迹播放](https://gitee.com/xieqianstudent/picture/raw/master/跳转轨迹播放.gif)
+
+
+
+#### 新增并播放轨迹
+
+![新增轨迹](https://gitee.com/xieqianstudent/picture/raw/master/新增轨迹.gif)
+
+
+
+
+
+
+
+### 创建TrackBackPlayer播放器对象
 
 ```javascript
 
@@ -69,29 +95,33 @@
                   	//销毁轨迹
     				trackPlayer.destroyTrack()
     				break;
+    				//新增轨迹
+    				case 'addTrack':
+    				trackPlayer.addTrackData(extraPointData)
+    				break;
     
     			}
 
 ###### 轨迹实例方法
 
-| 方法名称     | 方法类型                                                     | 描述说明                                                     |
-| ------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| init         | (map:L.map,TimePointData:Array<TimePointType>)=> InitBackDataType | 初始化轨迹方法 TimePointData:Array<TimePointType>为轨迹路线 JSON 数据 |
-| setSpeed     | (speed:number\|null)=> void                                  | 设置轨迹角色运动速度                                         |
-| addTrackData | (TimePointData:Array<TimePointType>)=>void                   | 添加轨迹数据                                                 |
-| startTrack   | (progress:number\|null)=> void                               | 运行轨迹 (传入运动轨迹进度，轨迹将自动跳转到指定进度开始运动) <br />tips：注意传入的轨迹进度必须是插件返回的轨迹步进值得倍数。否则轨迹实际运行的效果将会混乱 |
-| reStart      | ()=> void                                                    | 重置轨迹进度                                                 |
-| pauseTrack   | ()=> void                                                    | 暂停轨迹运动                                                 |
-| destroyTrack | ()=> void                                                    | 销毁轨迹<br />tips：销毁轨迹后需要重新 init 生成轨迹。       |
-| on           | (EventType: TrackBackPlayerEvent, cb:Function)=>void         | 监听插件事件。EventType : 插件暴露的事件类型 ，cb: 触发事件的回调函数 |
-| off          | (EventType: TrackBackPlayerEvent, cb:Function)=>void         | 解除指定插件事件。EventType : 插件暴露的事件类型 ，cb: 触发事件的回调函数 |
+| 方法名称     | 方法类型                                                          | 描述说明                                                                                                                                                     |
+| ------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| init         | (map:L.map,TimePointData:Array<TimePointType>)=> InitBackDataType | 初始化轨迹方法 TimePointData:Array<TimePointType>为轨迹路线 JSON 数据                                                                                        |
+| setSpeed     | (speed:number\|null)=> void                                       | 设置轨迹角色运动速度                                                                                                                                         |
+| addTrackData | (TimePointData:Array<TimePointType>)=>void                        | 添加轨迹数据                                                                                                                                                 |
+| startTrack   | (progress:number\|null)=> void                                    | 运行轨迹 (传入运动轨迹进度，轨迹将自动跳转到指定进度开始运动) <br />tips：注意传入的轨迹进度必须是插件返回的轨迹步进值得倍数。否则轨迹实际运行的效果将会混乱 |
+| reStart      | ()=> void                                                         | 重置轨迹进度                                                                                                                                                 |
+| pauseTrack   | ()=> void                                                         | 暂停轨迹运动                                                                                                                                                 |
+| destroyTrack | ()=> void                                                         | 销毁轨迹<br />tips：销毁轨迹后需要重新 init 生成轨迹。                                                                                                       |
+| on           | (EventType: TrackBackPlayerEvent, cb:Function)=>void              | 监听插件事件。EventType : 插件暴露的事件类型 ，cb: 触发事件的回调函数                                                                                        |
+| off          | (EventType: TrackBackPlayerEvent, cb:Function)=>void              | 解除指定插件事件。EventType : 插件暴露的事件类型 ，cb: 触发事件的回调函数                                                                                    |
 
-###### TrackBackPlayerEvent 类型 String 。 目前只暴露了 onProgressUpdate与onArriveTrackPoint 事件
+###### TrackBackPlayerEvent 类型 String 。 目前只暴露了 onProgressUpdate 与 onArriveTrackPoint 事件
 
-| 方法类型           | 方法说明                                                     |
-| ------------------ | ------------------------------------------------------------ |
+| 方法类型           | 方法说明                                                            |
+| ------------------ | ------------------------------------------------------------------- |
 | onProgressUpdate   | 轨迹进度更新触发事件。回调函数 接收 参数类型 **TrackInfo** 参考下文 |
-| onArriveTrackPoint | 当轨迹进行到其中的一个轨迹坐标点时触发                       |
+| onArriveTrackPoint | 当轨迹进行到其中的一个轨迹坐标点时触发                              |
 
 ###### TrackInfo 类型 Object
 
@@ -158,10 +188,6 @@ step3 调用 startTrack 方法传入所跳转的 轨迹点进度值 。轨迹将
 
 ##下版本更新计划
 
-1.加入轨迹开始，结束，暂停等更多事件
+1.点击回放轨迹路线跳转到指定位置开始进行
 
-2.加入到达每项轨迹点的标注与动画功能
-
-3.实现轨迹运行中动态增加轨迹点
-
-4.代码结构
+2.优化代码结构

@@ -1,12 +1,12 @@
 {
     "name": "leaflet-trackbackplayer",
     "private": false,
-    "version": "1.1.4",
+    "version": "1.2.2",
     "author": "coderxq",
     "description": "一个基于leaflet地图的可根据时间控制的轨迹回放插件",
     "keywords": [
         "javascript",
-        "leaflet",
+        "leaflet", 
         "plugins"
     ],
     "type": "module",
